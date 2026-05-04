@@ -1,0 +1,74 @@
+--- ALL DATA in mess_reviews (Limit 50) ---
+Date: 2026-02-16T18:30:00.000Z | Mess: [Mess A] | Meal: [lunch] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Good]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess A] | Meal: [dinner] | Quality: [Bad]
+Date: 2026-02-13T18:30:00.000Z | Mess: [Mess B] | Meal: [lunch] | Quality: [Good]
+
+--- DISTINCT QUALITIES ---
+[
+  {
+    "quality": "Good"
+  },
+  {
+    "quality": "Bad"
+  }
+]
+
+--- DISTINCT MEALS ---
+[
+  {
+    "meal": "lunch"
+  },
+  {
+    "meal": "breakfast"
+  },
+  {
+    "meal": "dinner"
+  }
+]

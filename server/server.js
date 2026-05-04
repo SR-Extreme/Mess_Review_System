@@ -238,7 +238,7 @@ app.get("/api/incidents", async (req, res) => {
   const mess = String(req.query.mess || "").trim();
   const range = String(req.query.range || "7").trim().toLowerCase();
   const date = String(req.query.date || "").trim();
-  const thresholdPercent = Number(req.query.thresholdPercent || 50);
+  const capacity = Number(req.query.capacity || 0);
 
   if (!mess) {
     return res.status(400).json({
@@ -260,11 +260,11 @@ app.get("/api/incidents", async (req, res) => {
       WHERE ${dateFilter.clause}
         AND mess = ?
       GROUP BY DATE_FORMAT(review_date, '%Y-%m-%d'), meal
-      HAVING (badCount * 100.0 / NULLIF(totalReviews, 0)) > ?
+      HAVING badCount > ?
       ORDER BY review_date DESC, meal ASC
     `;
 
-    const incidentsParams = [...dateFilter.params, mess, thresholdPercent];
+    const incidentsParams = [...dateFilter.params, mess, capacity * 0.5];
     const [incidentRows] = await pool.query(incidentsSql, incidentsParams);
 
     const incidents = incidentRows.map((r) => {
@@ -285,7 +285,7 @@ app.get("/api/incidents", async (req, res) => {
         range,
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
-        thresholdPercent,
+        capacity,
         incidents: [],
         studentIncidentSummary: [],
       });
@@ -298,7 +298,7 @@ app.get("/api/incidents", async (req, res) => {
         range,
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
-        thresholdPercent,
+        capacity,
         incidents: incidents.map((item) => ({ ...item, students: [] })),
         studentIncidentSummary: [],
         note: "No student detail columns found in mess_reviews table.",
@@ -388,7 +388,7 @@ app.get("/api/incidents", async (req, res) => {
       range,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
-      thresholdPercent,
+      capacity,
       incidents: Array.from(incidentMap.values()),
       studentIncidentSummary,
     });

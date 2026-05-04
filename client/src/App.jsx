@@ -117,7 +117,7 @@ function App() {
     setIncidentError(null);
 
     try {
-      const params = { mess: selectedMess, range, thresholdPercent: 50 };
+      const params = { mess: selectedMess, range, capacity: totalStrength };
       if (range === 'custom' && customDate) {
         params.date = customDate;
       }
@@ -129,7 +129,7 @@ function App() {
     } finally {
       setIncidentLoading(false);
     }
-  }, [selectedMess, range, customDate]);
+  }, [selectedMess, range, customDate, totalStrength]);
 
   useEffect(() => {
     fetchIncidents();
@@ -347,9 +347,9 @@ function App() {
               <div className="card incidents-card">
                 <div className="incidents-header">
                   <div>
-                    <h3>High Bad-Review Incidents (&gt;50%)</h3>
+                    <h3>High Bad-Review Incidents</h3>
                     <p>
-                      Showing only the date + meal where bad reviews crossed 50% of total votes.
+                      Showing only the date + meal where bad reviews crossed 50% of Student Capacity.
                     </p>
                   </div>
                   <button
@@ -375,7 +375,7 @@ function App() {
                         <span className="incident-date">{incident.date}</span>
                         <span className="incident-meal">{incident.meal}</span>
                         <span className="incident-stats">
-                          Bad: {incident.badCount}/{incident.totalReviews} ({incident.badPercentage}%)
+                          Bad: {incident.badCount} / {totalStrength} ({totalStrength ? ((incident.badCount / totalStrength) * 100).toFixed(1) : 0}%)
                         </span>
                         <span className="incident-students">
                           Affected students: {incident.students?.length || 0}
@@ -385,20 +385,6 @@ function App() {
                   </div>
                 )}
 
-                {!!incidentData.studentIncidentSummary?.length && (
-                  <div className="incident-student-summary">
-                    <h4>Students with repeated incidents (for refund analysis)</h4>
-                    <div className="student-summary-list">
-                      {incidentData.studentIncidentSummary.slice(0, 15).map((student, idx) => (
-                        <div key={`${student.studentId || student.email || student.name || idx}`} className="student-summary-row">
-                          <span>{student.name || 'Unknown Student'}</span>
-                          <span>{student.studentId || '-'}</span>
-                          <span>{student.incidentCount} incidents</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
