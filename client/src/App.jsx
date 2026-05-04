@@ -1,14 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import axios from 'axios';
+import './styles.css';
 
-// You can override this by creating `client/.env` with:
-// VITE_API_BASE=http://localhost:5001
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5001';
+const MOCK_MESSES = ['Mess A', 'Mess B'];
 
 const RANGE_OPTIONS = [
-  { id: 'daily', label: 'Today' },
-  { id: 'weekly', label: 'Last 7 days' },
-  { id: 'monthly', label: 'Last 30 days' },
+  { id: '1', label: '1 Day' },
+  { id: '7', label: '7 Days' },
+  { id: '30', label: '30 Days' },
 ];
+
+
+// Calculates height based on a modified logarithmic scale.
+
+const getLogHeight = (value) => {
+  if (!value || value <= 0) return 0;
+
+  // Math.log2(value) matches the intervals [1, 2, 4, 8... 2048]
+  // We offset by 1 to make 0 the true starting point.
+  const logVal = Math.log2(value) + 1;
+  const percent = (logVal / 12) * 100;
+
+  return Math.min(Math.max(percent, 0), 100);
+};
 
 // Helper function to format date as "Feb 3, 2026"
 const formatDate = (date) => {
@@ -19,21 +33,23 @@ const formatDate = (date) => {
   });
 };
 
-// Helper function to get date range string based on selected range.
-// This mirrors the backend logic, which always ends ranges on "yesterday".
-const getDateRangeString = (rangeType) => {
+// Helper function to get date range string
+const getDateRangeString = (rangeType, customDate) => {
+  if (rangeType === 'custom' && customDate) {
+    return formatDate(new Date(customDate));
+  }
+
   const today = new Date();
-  // "end" is yesterday (last fully completed day)
   const end = new Date(today);
   end.setDate(end.getDate() - 1);
 
-  if (rangeType === 'daily') {
+  if (rangeType === '1' || rangeType === 'daily') {
     return formatDate(end);
-  } else if (rangeType === 'weekly') {
+  } else if (rangeType === '7' || rangeType === 'weekly') {
     const startDate = new Date(end);
     startDate.setDate(end.getDate() - 6);
     return `${formatDate(startDate)} - ${formatDate(end)}`;
-  } else if (rangeType === 'monthly') {
+  } else if (rangeType === '30' || rangeType === 'monthly') {
     const startDate = new Date(end);
     startDate.setDate(end.getDate() - 29);
     return `${formatDate(startDate)} - ${formatDate(end)}`;
@@ -42,208 +58,199 @@ const getDateRangeString = (rangeType) => {
 };
 
 function App() {
-  const [messes, setMesses] = useState([]);
   const [selectedMess, setSelectedMess] = useState('');
-  const [range, setRange] = useState('daily');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [range, setRange] = useState('7');
+  const [customDate, setCustomDate] = useState('');
   const [summary, setSummary] = useState(null);
-  const [totalStrength, setTotalStrength] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [totalStrength, setTotalStrength] = useState('500');
+  const [messes, setMesses] = useState(MOCK_MESSES);
+  const [incidentData, setIncidentData] = useState(null);
+  const [incidentLoading, setIncidentLoading] = useState(false);
+  const [incidentError, setIncidentError] = useState(null);
 
-  // Debug: log every key state transition
   useEffect(() => {
-    console.log('[config] API_BASE =', API_BASE);
-  }, []);
-  useEffect(() => console.log('[state] messes =', messes), [messes]);
-  useEffect(() => console.log('[state] selectedMess =', selectedMess), [selectedMess]);
-  useEffect(() => console.log('[state] range =', range), [range]);
-  useEffect(() => console.log('[state] loading =', loading), [loading]);
-  useEffect(() => console.log('[state] error =', error), [error]);
-  useEffect(() => console.log('[state] summary =', summary), [summary]);
-
-  // Fetch list of messes (e.g. "Mess A", "Mess B")
-  useEffect(() => {
-    async function fetchMesses() {
+    const fetchMesses = async () => {
       try {
-        console.log('[fetch] /api/messes -> start');
-        const res = await fetch(`${API_BASE}/api/messes`);
-        console.log('[fetch] /api/messes -> status', res.status);
-        if (!res.ok) throw new Error('Failed to load mess list');
-        const data = await res.json();
-        console.log('[fetch] /api/messes -> data', data);
-        setMesses(data);
-        if (data.length > 0) {
-          setSelectedMess(data[0]);
+        const response = await axios.get('http://127.0.0.1:5000/api/messes');
+        if (response.data && response.data.length > 0) {
+          setMesses(response.data);
+          setSelectedMess(response.data[0]);
         }
       } catch (err) {
-        console.error(err);
-        setError('Could not load mess list. Check API server.');
+        console.error('Failed to fetch messes:', err);
+        if (!selectedMess) setSelectedMess(MOCK_MESSES[0]);
       }
-    }
+    };
     fetchMesses();
   }, []);
 
-  // Fetch summary whenever mess or range changes
-  useEffect(() => {
+  const fetchSummary = useCallback(async () => {
     if (!selectedMess) return;
 
-    async function fetchSummary() {
-      setLoading(true);
-      setError('');
-      try {
-        const params = new URLSearchParams({ mess: selectedMess, range });
-        const url = `${API_BASE}/api/summary?${params.toString()}`;
-        console.log('[fetch] /api/summary -> start', url);
-        const res = await fetch(url);
-        console.log('[fetch] /api/summary -> status', res.status);
-        if (!res.ok) throw new Error('Failed to load summary');
-        const data = await res.json();
-        console.log('[fetch] /api/summary -> data', data);
-        setSummary(data);
-      } catch (err) {
-        console.error(err);
-        setError('Could not load performance data. Check API server.');
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const params = { mess: selectedMess, range };
+      if (range === 'custom' && customDate) {
+        params.date = customDate;
       }
-    }
 
+      const response = await axios.get('http://127.0.0.1:5000/api/summary', { params });
+      setSummary(response.data);
+    } catch (err) {
+      console.error('Fetch error:', err);
+      setError('Failed to fetch dashboard data. Make sure the server is running.');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedMess, range, customDate]);
+
+  useEffect(() => {
     fetchSummary();
-  }, [selectedMess, range]);
+  }, [fetchSummary]);
 
-  // Build a list of all calendar dates between start and end (inclusive)
-  const buildDateList = (startDateStr, endDateStr) => {
-    if (!startDateStr || !endDateStr) return [];
-    const dates = [];
-    const start = new Date(`${startDateStr}T00:00:00`);
-    const end = new Date(`${endDateStr}T00:00:00`);
+  const fetchIncidents = useCallback(async () => {
+    if (!selectedMess) return;
+    setIncidentLoading(true);
+    setIncidentError(null);
 
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      dates.push(d.toISOString().slice(0, 10));
+    try {
+      const params = { mess: selectedMess, range, thresholdPercent: 50 };
+      if (range === 'custom' && customDate) {
+        params.date = customDate;
+      }
+      const response = await axios.get('http://127.0.0.1:5000/api/incidents', { params });
+      setIncidentData(response.data);
+    } catch (err) {
+      console.error('Incident fetch error:', err);
+      setIncidentError('Could not load bad-review incidents.');
+    } finally {
+      setIncidentLoading(false);
     }
-    return dates;
-  };
+  }, [selectedMess, range, customDate]);
 
-  // Prepare structures for per-day graphs and "bad day" (> 50% bad) counts
-  let dateList = [];
-  let dayDataMap = new Map();
-  let badDayCounts = {
-    breakfast: 0,
-    lunch: 0,
-    dinner: 0,
-    overall: 0,
-  };
+  useEffect(() => {
+    fetchIncidents();
+  }, [fetchIncidents]);
 
-  const totalStrengthNum = Number(totalStrength) || 0;
-
-  if (summary && summary.startDate && summary.endDate) {
-    dateList = buildDateList(summary.startDate, summary.endDate);
-
-    // For weekly, ensure we only show exactly 7 days of cards
-    // even if the backend returns an extra boundary day.
-    if (range === 'weekly' && dateList.length > 7) {
-      dateList = dateList.slice(dateList.length - 7);
-    }
-
-    if (Array.isArray(summary.days)) {
-      dayDataMap = new Map(summary.days.map((d) => [d.date, d]));
+  const { dateList, dayDataMap, badDayCounts } = useMemo(() => {
+    if (!summary || !summary.days || !Array.isArray(summary.days)) {
+      return {
+        dateList: [],
+        dayDataMap: new Map(),
+        badDayCounts: { breakfast: 0, lunch: 0, dinner: 0, overall: 0 }
+      };
     }
 
-    if (totalStrengthNum > 0 && dateList.length > 0) {
-      const thresholdPerMeal = 0.5 * totalStrengthNum;
-      const thresholdOverall = 1.5 * totalStrengthNum; // 50% of 3 * totalStrength
+    const days = summary.days;
+    const map = new Map();
+    const badCounts = { breakfast: 0, lunch: 0, dinner: 0, overall: 0 };
 
-      dateList.forEach((dateStr) => {
-        const dayEntry = dayDataMap.get(dateStr);
-        const mealsArr = dayEntry?.meals || [];
-        const mealMap = {};
-        mealsArr.forEach((m) => {
-          if (m?.meal) {
-            mealMap[m.meal.toLowerCase()] = m;
-          }
-        });
+    days.forEach((day) => {
+      const dateStr = day.date;
+      map.set(dateStr, day);
+    });
 
-        const breakfast = mealMap.breakfast || { goodCount: 0, badCount: 0 };
-        const lunch = mealMap.lunch || { goodCount: 0, badCount: 0 };
-        const dinner = mealMap.dinner || { goodCount: 0, badCount: 0 };
+    const sortedDates = Array.from(map.keys()).sort((a, b) => b.localeCompare(a));
 
-        const overallBad =
-          (breakfast.badCount || 0) +
-          (lunch.badCount || 0) +
-          (dinner.badCount || 0);
+    sortedDates.forEach(dateStr => {
+      const day = map.get(dateStr);
+      const meals = day.meals || [];
+      let dayOverallGood = 0;
+      let dayOverallBad = 0;
 
-        if ((breakfast.badCount || 0) > thresholdPerMeal) {
-          badDayCounts.breakfast += 1;
+      const mealCounts = { breakfast: { g: 0, b: 0 }, lunch: { g: 0, b: 0 }, dinner: { g: 0, b: 0 } };
+
+      meals.forEach(m => {
+        const type = m.meal.toLowerCase();
+        if (mealCounts[type]) {
+          mealCounts[type].g += (m.goodCount || 0);
+          mealCounts[type].b += (m.badCount || 0);
         }
-        if ((lunch.badCount || 0) > thresholdPerMeal) {
-          badDayCounts.lunch += 1;
-        }
-        if ((dinner.badCount || 0) > thresholdPerMeal) {
-          badDayCounts.dinner += 1;
-        }
-        if (overallBad > thresholdOverall) {
-          badDayCounts.overall += 1;
-        }
+        dayOverallGood += (m.goodCount || 0);
+        dayOverallBad += (m.badCount || 0);
       });
-    }
-  }
 
-  // Build human-readable labels for the active range based on actual summary dates,
-  // so that "Last X days" matches the range length card below.
-  const rangeLabelText = (() => {
-    if (!summary || !summary.startDate || !summary.endDate) {
-      if (range === 'daily') return 'Today';
-      if (range === 'weekly') return 'Last 7 days';
-      if (range === 'monthly') return 'Last 30 days';
-      return '';
-    }
+      const threshold = Number(totalStrength || 0) * 0.5;
+      if (mealCounts.breakfast.b > threshold) badCounts.breakfast++;
+      if (mealCounts.lunch.b > threshold) badCounts.lunch++;
+      if (mealCounts.dinner.b > threshold) badCounts.dinner++;
+      if (dayOverallBad > threshold) badCounts.overall++;
+    });
 
-    const start = new Date(`${summary.startDate}T00:00:00`);
-    const end = new Date(`${summary.endDate}T00:00:00`);
+    return { dateList: sortedDates, dayDataMap: map, badDayCounts: badCounts };
+  }, [summary, totalStrength]);
 
-    const diffMs = end.getTime() - start.getTime();
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+  const rangeDateText = getDateRangeString(range, customDate);
 
-    if (range === 'daily') {
-      return formatDate(end);
-    }
+  const handleRangeChange = (newRange) => {
+    setRange(newRange);
+    if (newRange !== 'custom') setCustomDate('');
+  };
 
-    if (range === 'weekly' || range === 'monthly') {
-      return `Last ${days} days`;
-    }
+  const exportIncidentStudents = () => {
+    const students = incidentData?.studentIncidentSummary || [];
+    if (!students.length) return;
 
-    return '';
-  })();
+    const headers = [
+      'student_id',
+      'name',
+      'email',
+      'hostel',
+      'room_no',
+      'department',
+      'batch',
+      'incident_count',
+      'total_bad_votes_in_incidents',
+    ];
 
-  const rangeDateText = (() => {
-    if (!summary || !summary.startDate || !summary.endDate) {
-      return getDateRangeString(range);
-    }
+    const esc = (value) => {
+      const text = value === null || value === undefined ? '' : String(value);
+      return `"${text.replace(/"/g, '""')}"`;
+    };
 
-    const start = new Date(`${summary.startDate}T00:00:00`);
-    const end = new Date(`${summary.endDate}T00:00:00`);
+    const rows = students.map((s) =>
+      [
+        s.studentId,
+        s.name,
+        s.email,
+        s.hostel,
+        s.roomNo,
+        s.department,
+        s.batch,
+        s.incidentCount,
+        s.totalBadVotesInIncidents,
+      ].map(esc).join(',')
+    );
 
-    // If the range is just a single day (e.g. daily), show that day once.
-    if (summary.startDate === summary.endDate) {
-      return formatDate(end);
-    }
-
-    return `${formatDate(start)} - ${formatDate(end)}`;
-  })();
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `incident_students_${selectedMess.replace(/\s+/g, '_').toLowerCase()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="app">
       <header className="header">
-        <h1>Mess Review Dashboard</h1>
-        <p>Compare performance of Mess A and Mess B for breakfast, lunch and dinner.</p>
+        <div className="header-content">
+          <h1>Mess Review Dashboard</h1>
+          <p>Tracking quality of service and student satisfaction across campus messes.</p>
+        </div>
       </header>
 
       <main>
-        <section className="filters">
+        <div className="filters card">
           <div className="filter-group">
-            <label htmlFor="mess-select">Mess</label>
+            <span className="filter-label">Select Mess</span>
             <select
-              id="mess-select"
               value={selectedMess}
               onChange={(e) => setSelectedMess(e.target.value)}
             >
@@ -256,212 +263,209 @@ function App() {
           </div>
 
           <div className="filter-group">
-            <span>Time range</span>
+            <span className="filter-label">Time Period</span>
             <div className="range-buttons">
               {RANGE_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
-                  className={range === opt.id ? 'range-btn active' : 'range-btn'}
-                  onClick={() => setRange(opt.id)}
+                  className={`range-btn ${range === opt.id ? 'active' : ''}`}
+                  onClick={() => handleRangeChange(opt.id)}
                 >
                   {opt.label}
                 </button>
               ))}
+              <input
+                type="date"
+                className={`date-picker-inline ${range === 'custom' ? 'active' : ''}`}
+                value={customDate}
+                onChange={(e) => {
+                  setCustomDate(e.target.value);
+                  setRange('custom');
+                }}
+              />
             </div>
           </div>
 
           <div className="filter-group">
-            <label htmlFor="strength-input">Total strength (students)</label>
+            <span className="filter-label">Student Capacity</span>
             <div className="strength-input-wrapper">
               <input
-                id="strength-input"
                 type="number"
-                min="0"
                 value={totalStrength}
                 onChange={(e) => setTotalStrength(e.target.value)}
-                placeholder="Enter total strength for this mess"
+                placeholder="Total Strength"
+                min="0"
               />
-              {totalStrengthNum > 0 && (
-                <span className="strength-chip">
-                  {totalStrengthNum} expected responses / meal
-                </span>
-              )}
+              {totalStrength && <span className="strength-chip">{totalStrength} students</span>}
             </div>
-            <p className="field-help">
-              Used to calculate % of bad days and expected responses.
-            </p>
           </div>
-        </section>
+        </div>
 
-        {loading && <div className="info">Loading data…</div>}
+        {loading && <div className="loading">Processing mess analytics...</div>}
         {error && <div className="error">{error}</div>}
 
-        {summary && !loading && (
+        {!loading && !error && summary && (
           <section className="summary-section">
             <div className="summary-header">
-              <h2>
-                {summary.mess} – {rangeLabelText}
-              </h2>
-              <p className="date-range">
+              <div className="summary-title-row">
+                <h2>Live Quality Report</h2>
+              </div>
+              <p>Performance metrics based on anonymous student feedback.</p>
+              <div className="date-range-badge">
                 {rangeDateText}
-              </p>
+              </div>
             </div>
 
-            {(!summary.days || summary.days.length === 0) && (
-              <div className="info">No reviews in this period for this mess.</div>
+            {range !== '1' && range !== 'custom' && dateList.length > 0 && (
+              <div className="card bad-days-card">
+                {/* <div className="card-title">Alert: High Dissatisfaction</div> */}
+                <p className="card-subtitle">
+                  Number of days where "Bad" reviews exceeded 50% of Student Capacity over <span className="card-total-value">{dateList.length} days</span>
+                </p>
+                <div className="card-metrics">
+                  <div className="metric-item">
+                    <span className="metric-label">Breakfast</span>
+                    <span className="metric-value">{badDayCounts.breakfast} / {dateList.length}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">Lunch</span>
+                    <span className="metric-value">{badDayCounts.lunch} / {dateList.length}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="metric-label">Dinner</span>
+                    <span className="metric-value">{badDayCounts.dinner} / {dateList.length}</span>
+                  </div>
+                  <div className="metric-item highlight">
+                    <span className="metric-label">Overall</span>
+                    <span className="metric-value">{badDayCounts.overall} / {dateList.length}</span>
+                  </div>
+                </div>
+              </div>
             )}
 
-            {summary.days && summary.days.length > 0 && (
-              <>
-                {totalStrengthNum > 0 && dateList.length > 0 && (
-                  <div className="bad-days-summary card">
-                    <h3 className="card-title">Days with &gt; 50% bad votes</h3>
-                    <p className="card-total">
-                      <span className="card-total-label">Range length</span>
-                      <span className="card-total-value">{dateList.length} days</span>
+            {!incidentLoading && !incidentError && incidentData && (
+              <div className="card incidents-card">
+                <div className="incidents-header">
+                  <div>
+                    <h3>High Bad-Review Incidents (&gt;50%)</h3>
+                    <p>
+                      Showing only the date + meal where bad reviews crossed 50% of total votes.
                     </p>
-                    <div className="card-metrics">
-                      <div>
-                        <span className="metric-label">Breakfast</span>
-                        <span className="metric-value">
-                          {badDayCounts.breakfast} / {dateList.length}
+                  </div>
+                  <button
+                    className="export-btn"
+                    onClick={exportIncidentStudents}
+                    disabled={!incidentData.studentIncidentSummary?.length}
+                  >
+                    Export Affected Students CSV
+                  </button>
+                </div>
+
+                {incidentData.note && <div className="incident-note">{incidentData.note}</div>}
+
+                {!incidentData.incidents?.length ? (
+                  <div className="incident-empty">No incidents found for selected filters.</div>
+                ) : (
+                  <div className="incident-list">
+                    {incidentData.incidents.map((incident) => (
+                      <div
+                        key={`${incident.date}-${incident.meal}`}
+                        className="incident-item"
+                      >
+                        <span className="incident-date">{incident.date}</span>
+                        <span className="incident-meal">{incident.meal}</span>
+                        <span className="incident-stats">
+                          Bad: {incident.badCount}/{incident.totalReviews} ({incident.badPercentage}%)
+                        </span>
+                        <span className="incident-students">
+                          Affected students: {incident.students?.length || 0}
                         </span>
                       </div>
-                      <div>
-                        <span className="metric-label">Lunch</span>
-                        <span className="metric-value">
-                          {badDayCounts.lunch} / {dateList.length}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="metric-label">Dinner</span>
-                        <span className="metric-value">
-                          {badDayCounts.dinner} / {dateList.length}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="metric-label">Overall</span>
-                        <span className="metric-value">
-                          {badDayCounts.overall} / {dateList.length}
-                        </span>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 )}
 
-                <div className="day-graphs">
-                  {dateList.map((dateStr) => {
-                    const dayEntry = dayDataMap.get(dateStr);
-                    const mealsArr = dayEntry?.meals || [];
-                    const mealMap = {};
-                    mealsArr.forEach((m) => {
-                      if (m?.meal) {
-                        mealMap[m.meal.toLowerCase()] = m;
-                      }
-                    });
+                {!!incidentData.studentIncidentSummary?.length && (
+                  <div className="incident-student-summary">
+                    <h4>Students with repeated incidents (for refund analysis)</h4>
+                    <div className="student-summary-list">
+                      {incidentData.studentIncidentSummary.slice(0, 15).map((student, idx) => (
+                        <div key={`${student.studentId || student.email || student.name || idx}`} className="student-summary-row">
+                          <span>{student.name || 'Unknown Student'}</span>
+                          <span>{student.studentId || '-'}</span>
+                          <span>{student.incidentCount} incidents</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
-                    const breakfast = mealMap.breakfast || {
-                      totalReviews: 0,
-                      goodCount: 0,
-                      badCount: 0,
-                    };
-                    const lunch = mealMap.lunch || {
-                      totalReviews: 0,
-                      goodCount: 0,
-                      badCount: 0,
-                    };
-                    const dinner = mealMap.dinner || {
-                      totalReviews: 0,
-                      goodCount: 0,
-                      badCount: 0,
-                    };
+            {incidentLoading && <div className="loading">Loading bad-review incidents...</div>}
+            {incidentError && <div className="error">{incidentError}</div>}
 
-                    const overallGood =
-                      (breakfast.goodCount || 0) +
-                      (lunch.goodCount || 0) +
-                      (dinner.goodCount || 0);
-                    const overallBad =
-                      (breakfast.badCount || 0) +
-                      (lunch.badCount || 0) +
-                      (dinner.badCount || 0);
+            <div className="day-graphs">
+              {dateList.map((dateStr) => {
+                const dayEntry = dayDataMap.get(dateStr);
+                const mealsArr = dayEntry?.meals || [];
+                const mealMap = {};
+                mealsArr.forEach((m) => {
+                  if (m?.meal) mealMap[m.meal.toLowerCase()] = m;
+                });
 
-                    const bars = [
-                      {
-                        key: 'breakfast',
-                        label: 'Breakfast',
-                        good: breakfast.goodCount || 0,
-                        bad: breakfast.badCount || 0,
-                        base: totalStrengthNum,
-                      },
-                      {
-                        key: 'lunch',
-                        label: 'Lunch',
-                        good: lunch.goodCount || 0,
-                        bad: lunch.badCount || 0,
-                        base: totalStrengthNum,
-                      },
-                      {
-                        key: 'dinner',
-                        label: 'Dinner',
-                        good: dinner.goodCount || 0,
-                        bad: dinner.badCount || 0,
-                        base: totalStrengthNum,
-                      },
-                      {
-                        key: 'overall',
-                        label: 'Overall',
-                        good: overallGood,
-                        bad: overallBad,
-                        base: totalStrengthNum > 0 ? 3 * totalStrengthNum : 0,
-                      },
-                    ];
+                const breakfast = mealMap.breakfast || { goodCount: 0, badCount: 0 };
+                const lunch = mealMap.lunch || { goodCount: 0, badCount: 0 };
+                const dinner = mealMap.dinner || { goodCount: 0, badCount: 0 };
 
-                    const displayDate = (() => {
-                      const d = new Date(`${dateStr}T00:00:00`);
-                      d.setDate(d.getDate() + 1);
-                      return formatDate(d);
-                    })();
+                const overallGood = (breakfast.goodCount || 0) + (lunch.goodCount || 0) + (dinner.goodCount || 0);
+                const overallBad = (breakfast.badCount || 0) + (lunch.badCount || 0) + (dinner.badCount || 0);
 
-                    return (
-                      <div key={dateStr} className="card day-card">
-                        <h3 className="card-title">{displayDate}</h3>
-                        <div className="day-card-content">
-                          <div className="vertical-bars">
+                const bars = [
+                  { key: 'breakfast', label: 'Breakfast', fullLabel: 'Breakfast', good: breakfast.goodCount, bad: breakfast.badCount },
+                  { key: 'lunch', label: 'Lunch', fullLabel: 'Lunch', good: lunch.goodCount, bad: lunch.badCount },
+                  { key: 'dinner', label: 'Dinner', fullLabel: 'Dinner', good: dinner.goodCount, bad: dinner.badCount },
+                  { key: 'overall', label: 'Overall', fullLabel: 'Total', good: overallGood, bad: overallBad },
+                ];
+
+                const displayDate = (() => {
+                  const d = new Date(`${dateStr}T00:00:00`);
+                  return formatDate(d);
+                })();
+
+                const yAxisLabels = [2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 0];
+
+                return (
+                  <div key={dateStr} className="card day-card compact">
+                    <h3 className="card-title-compact">{displayDate}</h3>
+                    <div className="day-card-content">
+                      <div className="compact-chart-container">
+                        <div className="y-axis-compact">
+                          {yAxisLabels.map((l) => (
+                            <div key={l} className="y-label-nano-wrapper">
+                              <span className="y-label-nano">{l}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="chart-main-area">
+                          <div className="vertical-axis-line" />
+                          <div className="vertical-bars-compact">
                             {bars.map((bar) => {
-                              const base = bar.base || 0;
-                              const goodPercent =
-                                base > 0 ? ((bar.good || 0) / base) * 100 : 0;
-                              const badPercent =
-                                base > 0 ? ((bar.bad || 0) / base) * 100 : 0;
-                              const totalVotes = (bar.good || 0) + (bar.bad || 0);
-
+                              const goodHeight = getLogHeight(bar.good);
+                              const badHeight = getLogHeight(bar.bad);
                               return (
-                                <div key={bar.key} className="vertical-bar-item">
-                                  <div className="vertical-bar">
-                                    <div
-                                      className="vertical-bar-good"
-                                      style={{ height: `${goodPercent}%` }}
-                                    />
-                                    <div
-                                      className="vertical-bar-bad"
-                                      style={{ height: `${badPercent}%` }}
-                                    />
-                                  </div>
-                                  <div className="vertical-bar-label">
-                                    {bar.label}
-                                  </div>
-                                  <div className="vertical-bar-stats">
-                                    <span>
-                                      Good {bar.good} / Bad {bar.bad}
-                                    </span>
-                                    {base > 0 && (
-                                      <span>
-                                        {' '}
-                                        ({totalVotes} responses,{' '}
-                                        {badPercent.toFixed(1)}% bad of expected{' '}
-                                        {base})
-                                      </span>
-                                    )}
+                                <div key={bar.key} className="bar-col-compact">
+                                  <div className="bar-box-pair">
+                                    <div className="bar-half">
+                                      <div className="bar-seg-good side" style={{ height: `${goodHeight}%` }}>
+                                        <div className="bubble-tooltip-nano">Good: {bar.good}</div>
+                                      </div>
+                                    </div>
+                                    <div className="bar-half">
+                                      <div className="bar-seg-bad side" style={{ height: `${badHeight}%` }}>
+                                        <div className="bubble-tooltip-nano">Bad: {bar.bad}</div>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -469,11 +473,22 @@ function App() {
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+                      <div className="chart-labels-footer">
+                        <div className="labels-spacer" /> {/* Matches y-axis width */}
+                        <div className="labels-row">
+                          {bars.map((bar) => (
+                            <div key={bar.key} className="label-item">
+                              <span className="bar-label-nano" title={bar.fullLabel}>{bar.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="day-footer-compact">{overallGood + overallBad} responses</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         )}
       </main>
@@ -482,4 +497,3 @@ function App() {
 }
 
 export default App;
-
