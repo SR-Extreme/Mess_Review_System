@@ -157,26 +157,26 @@ function App() {
 
     sortedDates.forEach(dateStr => {
       const day = map.get(dateStr);
-      const meals = day.meals || [];
+      const foods = day.foods || [];
       let dayOverallGood = 0;
       let dayOverallBad = 0;
 
-      const mealCounts = { breakfast: { g: 0, b: 0 }, lunch: { g: 0, b: 0 }, dinner: { g: 0, b: 0 } };
+      const foodCounts = { breakfast: { g: 0, b: 0 }, lunch: { g: 0, b: 0 }, dinner: { g: 0, b: 0 } };
 
-      meals.forEach(m => {
-        const type = m.meal.toLowerCase();
-        if (mealCounts[type]) {
-          mealCounts[type].g += (m.goodCount || 0);
-          mealCounts[type].b += (m.badCount || 0);
+      foods.forEach(f => {
+        const type = f.food.toLowerCase();
+        if (foodCounts[type]) {
+          foodCounts[type].g += (f.goodCount || 0);
+          foodCounts[type].b += (f.badCount || 0);
         }
-        dayOverallGood += (m.goodCount || 0);
-        dayOverallBad += (m.badCount || 0);
+        dayOverallGood += (f.goodCount || 0);
+        dayOverallBad += (f.badCount || 0);
       });
 
       const threshold = Number(totalStrength || 0) * 0.5;
-      if (mealCounts.breakfast.b > threshold) badCounts.breakfast++;
-      if (mealCounts.lunch.b > threshold) badCounts.lunch++;
-      if (mealCounts.dinner.b > threshold) badCounts.dinner++;
+      if (foodCounts.breakfast.b > threshold) badCounts.breakfast++;
+      if (foodCounts.lunch.b > threshold) badCounts.lunch++;
+      if (foodCounts.dinner.b > threshold) badCounts.dinner++;
       if (dayOverallBad > threshold) badCounts.overall++;
     });
 
@@ -195,13 +195,8 @@ function App() {
     if (!students.length) return;
 
     const headers = [
-      'student_id',
-      'name',
+      'roll_number',
       'email',
-      'hostel',
-      'room_no',
-      'department',
-      'batch',
       'incident_count',
       'total_bad_votes_in_incidents',
     ];
@@ -213,13 +208,8 @@ function App() {
 
     const rows = students.map((s) =>
       [
-        s.studentId,
-        s.name,
+        s.rollNumber,
         s.email,
-        s.hostel,
-        s.roomNo,
-        s.department,
-        s.batch,
         s.incidentCount,
         s.totalBadVotesInIncidents,
       ].map(esc).join(',')
@@ -369,11 +359,11 @@ function App() {
                   <div className="incident-list">
                     {incidentData.incidents.map((incident) => (
                       <div
-                        key={`${incident.date}-${incident.meal}`}
+                        key={`${incident.date}-${incident.food}`}
                         className="incident-item"
                       >
                         <span className="incident-date">{incident.date}</span>
-                        <span className="incident-meal">{incident.meal}</span>
+                        <span className="incident-meal">{incident.food}</span>
                         <span className="incident-stats">
                           Bad: {incident.badCount} / {totalStrength} ({totalStrength ? ((incident.badCount / totalStrength) * 100).toFixed(1) : 0}%)
                         </span>
@@ -394,15 +384,15 @@ function App() {
             <div className="day-graphs">
               {dateList.map((dateStr) => {
                 const dayEntry = dayDataMap.get(dateStr);
-                const mealsArr = dayEntry?.meals || [];
-                const mealMap = {};
-                mealsArr.forEach((m) => {
-                  if (m?.meal) mealMap[m.meal.toLowerCase()] = m;
+                const foodsArr = dayEntry?.foods || [];
+                const foodMap = {};
+                foodsArr.forEach((f) => {
+                  if (f?.food) foodMap[f.food.toLowerCase()] = f;
                 });
 
-                const breakfast = mealMap.breakfast || { goodCount: 0, badCount: 0 };
-                const lunch = mealMap.lunch || { goodCount: 0, badCount: 0 };
-                const dinner = mealMap.dinner || { goodCount: 0, badCount: 0 };
+                const breakfast = foodMap.breakfast || { goodCount: 0, badCount: 0 };
+                const lunch = foodMap.lunch || { goodCount: 0, badCount: 0 };
+                const dinner = foodMap.dinner || { goodCount: 0, badCount: 0 };
 
                 const overallGood = (breakfast.goodCount || 0) + (lunch.goodCount || 0) + (dinner.goodCount || 0);
                 const overallBad = (breakfast.badCount || 0) + (lunch.badCount || 0) + (dinner.badCount || 0);

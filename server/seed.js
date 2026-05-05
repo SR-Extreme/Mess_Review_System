@@ -9,19 +9,12 @@ function formatDate(d) {
 }
 
 function makeStudents(count) {
-  const departments = ["CSE", "ECE", "ME", "CE", "EE"];
-  const hostels = ["A Block", "B Block", "C Block"];
   const students = [];
 
   for (let i = 1; i <= count; i += 1) {
     students.push({
-      student_id: `STU${String(i).padStart(4, "0")}`,
-      student_name: `Student ${i}`,
-      student_email: `student${i}@college.edu`,
-      hostel: hostels[i % hostels.length],
-      room_no: `R-${100 + i}`,
-      department: departments[i % departments.length],
-      batch: 2026 + (i % 3),
+      roll_number: `STU${String(i).padStart(4, "0")}`,
+      email: `student${i}@iiits.in`,
     });
   }
 
@@ -43,44 +36,21 @@ async function seed() {
 
     await connection.beginTransaction();
 
+    await connection.query("DROP TABLE IF EXISTS mess_reviews");
+
     await connection.query(`
-      CREATE TABLE IF NOT EXISTS mess_reviews (
-        id INT PRIMARY KEY AUTO_INCREMENT,
+      CREATE TABLE mess_reviews (
+        date DATE NOT NULL,
+        email VARCHAR(150) NULL,
+        roll_number VARCHAR(30) NOT NULL,
         mess VARCHAR(50) NOT NULL,
-        meal ENUM('breakfast','lunch','dinner') NOT NULL,
-        review_date DATE NOT NULL,
+        food ENUM('breakfast','lunch','dinner') NOT NULL,
         quality VARCHAR(10) NOT NULL,
-        student_id VARCHAR(30) NULL,
-        student_name VARCHAR(120) NULL,
-        student_email VARCHAR(150) NULL,
-        hostel VARCHAR(80) NULL,
-        room_no VARCHAR(20) NULL,
-        department VARCHAR(60) NULL,
-        batch INT NULL,
-        INDEX idx_mess_date_meal (mess, review_date, meal),
+        PRIMARY KEY (roll_number, date, food),
+        INDEX idx_mess_date_food (mess, date, food),
         INDEX idx_quality (quality)
       )
     `);
-
-    // Add columns if table existed before without student details.
-    const alterStatements = [
-      "ALTER TABLE mess_reviews ADD COLUMN student_id VARCHAR(30) NULL",
-      "ALTER TABLE mess_reviews ADD COLUMN student_name VARCHAR(120) NULL",
-      "ALTER TABLE mess_reviews ADD COLUMN student_email VARCHAR(150) NULL",
-      "ALTER TABLE mess_reviews ADD COLUMN hostel VARCHAR(80) NULL",
-      "ALTER TABLE mess_reviews ADD COLUMN room_no VARCHAR(20) NULL",
-      "ALTER TABLE mess_reviews ADD COLUMN department VARCHAR(60) NULL",
-      "ALTER TABLE mess_reviews ADD COLUMN batch INT NULL",
-    ];
-    for (const stmt of alterStatements) {
-      try {
-        await connection.query(stmt);
-      } catch (_e) {
-        // Ignore "duplicate column" errors.
-      }
-    }
-
-    await connection.query("DELETE FROM mess_reviews");
 
     const students = makeStudents(80);
     const today = new Date();
@@ -92,8 +62,9 @@ async function seed() {
       date.setDate(date.getDate() - dayOffset);
       const dateStr = formatDate(date);
 
-      for (const mess of MESSES) {
-        for (const meal of MEALS) {
+      for (const meal of ["breakfast", "lunch", "dinner"]) {
+        const used = new Set();
+        for (const mess of ["Mess A", "Mess B"]) {
           // Mark some combinations as incidents (>50% bad).
           const incident =
             (mess === "Mess A" && meal === "lunch" && dayOffset % 2 === 0) ||
@@ -102,7 +73,6 @@ async function seed() {
           const badVotes = incident ? 12 : 4;
           const goodVotes = incident ? 8 : 16;
 
-          const used = new Set();
           const pickStudent = () => {
             while (true) {
               const idx = Math.floor(Math.random() * students.length);
@@ -116,34 +86,24 @@ async function seed() {
           for (let i = 0; i < badVotes; i += 1) {
             const s = pickStudent();
             values.push([
-              mess,
-              meal,
               dateStr,
+              s.email,
+              s.roll_number,
+              mess,
+              meal, // corresponding to food
               "bad",
-              s.student_id,
-              s.student_name,
-              s.student_email,
-              s.hostel,
-              s.room_no,
-              s.department,
-              s.batch,
             ]);
           }
 
           for (let i = 0; i < goodVotes; i += 1) {
             const s = pickStudent();
             values.push([
-              mess,
-              meal,
               dateStr,
+              s.email,
+              s.roll_number,
+              mess,
+              meal, // corresponding to food
               "good",
-              s.student_id,
-              s.student_name,
-              s.student_email,
-              s.hostel,
-              s.room_no,
-              s.department,
-              s.batch,
             ]);
           }
         }
@@ -153,8 +113,7 @@ async function seed() {
     await connection.query(
       `
         INSERT INTO mess_reviews (
-          mess, meal, review_date, quality,
-          student_id, student_name, student_email, hostel, room_no, department, batch
+          date, email, roll_number, mess, food, quality
         )
         VALUES ?
       `,

@@ -112,26 +112,21 @@ function getDateRange(range, customDate) {
 function buildDateFilterClause(dateRange) {
   if (dateRange.isCustom) {
     return {
-      clause: "DATE_FORMAT(review_date, '%Y-%m-%d') = ?",
+      clause: "DATE_FORMAT(date, '%Y-%m-%d') = ?",
       params: [dateRange.customValue],
     };
   }
 
   return {
-    clause: `DATE(review_date) >= ${dateRange.sql} AND DATE(review_date) <= CURDATE()`,
+    clause: `DATE(date) >= ${dateRange.sql} AND DATE(date) <= CURDATE()`,
     params: [],
   };
 }
 
 async function getStudentColumns() {
   const wantedColumns = [
-    "student_id",
-    "student_name",
-    "student_email",
-    "hostel",
-    "room_no",
-    "department",
-    "batch",
+    "roll_number",
+    "email",
   ];
 
   const [rows] = await pool.query(
@@ -165,23 +160,23 @@ app.get("/api/summary", async (req, res) => {
 
   try {
     const filterSql = dateRange.isCustom
-      ? `review_date = ?`
-      : `review_date >= ${dateRange.sql} AND review_date < CURDATE()`;
+      ? `date = ?`
+      : `date >= ${dateRange.sql} AND date < CURDATE()`;
 
     const params = dateRange.isCustom ? [dateRange.customValue, mess] : [mess];
 
     const sql = `
       SELECT
-        DATE_FORMAT(review_date, '%Y-%m-%d') AS review_date,
-        meal,
+        DATE_FORMAT(date, '%Y-%m-%d') AS date,
+        food,
         COUNT(*) AS totalReviews,
         SUM(CASE WHEN LOWER(TRIM(quality)) = 'good' THEN 1 ELSE 0 END) AS goodCount,
         SUM(CASE WHEN LOWER(TRIM(quality)) = 'bad' THEN 1 ELSE 0 END) AS badCount
       FROM mess_reviews
-      WHERE ${dateRange.isCustom ? "DATE_FORMAT(review_date, '%Y-%m-%d') = ?" : `DATE(review_date) >= ${dateRange.sql} AND DATE(review_date) <= CURDATE()`}
+      WHERE ${dateRange.isCustom ? "DATE_FORMAT(date, '%Y-%m-%d') = ?" : `DATE(date) >= ${dateRange.sql} AND DATE(date) <= CURDATE()`}
         AND mess = ?
-      GROUP BY DATE_FORMAT(review_date, '%Y-%m-%d'), meal
-      ORDER BY review_date ASC, meal ASC
+      GROUP BY DATE_FORMAT(date, '%Y-%m-%d'), food
+      ORDER BY date ASC, food ASC
     `;
 
     const [rows] = await pool.query(sql, params);
@@ -191,7 +186,7 @@ app.get("/api/summary", async (req, res) => {
     const dayMap = new Map();
 
     for (const r of rows) {
-      const rawDate = r.review_date;
+      const rawDate = r.date;
       const dateStr =
         rawDate instanceof Date
           ? rawDate.toISOString().slice(0, 10)
@@ -200,13 +195,13 @@ app.get("/api/summary", async (req, res) => {
       if (!dayMap.has(dateStr)) {
         dayMap.set(dateStr, {
           date: dateStr,
-          meals: [],
+          foods: [],
         });
       }
 
       const dayEntry = dayMap.get(dateStr);
-      dayEntry.meals.push({
-        meal: r.meal,
+      dayEntry.foods.push({
+        food: r.food,
         totalReviews: Number(r.totalReviews || 0),
         goodCount: Number(r.goodCount || 0),
         badCount: Number(r.badCount || 0),
@@ -252,16 +247,16 @@ app.get("/api/incidents", async (req, res) => {
   try {
     const incidentsSql = `
       SELECT
-        DATE_FORMAT(review_date, '%Y-%m-%d') AS review_date,
-        meal,
+        DATE_FORMAT(date, '%Y-%m-%d') AS date,
+        food,
         COUNT(*) AS totalReviews,
         SUM(CASE WHEN LOWER(TRIM(quality)) = 'bad' THEN 1 ELSE 0 END) AS badCount
       FROM mess_reviews
       WHERE ${dateFilter.clause}
         AND mess = ?
-      GROUP BY DATE_FORMAT(review_date, '%Y-%m-%d'), meal
+      GROUP BY DATE_FORMAT(date, '%Y-%m-%d'), food
       HAVING badCount > ?
-      ORDER BY review_date DESC, meal ASC
+      ORDER BY date DESC, food ASC
     `;
 
     const incidentsParams = [...dateFilter.params, mess, capacity * 0.5];
@@ -271,8 +266,8 @@ app.get("/api/incidents", async (req, res) => {
       const totalReviews = Number(r.totalReviews || 0);
       const badCount = Number(r.badCount || 0);
       return {
-        date: String(r.review_date),
-        meal: String(r.meal || ""),
+        date: String(r.date),
+        food: String(r.food || ""),
         totalReviews,
         badCount,
         badPercentage: totalReviews ? Number(((badCount / totalReviews) * 100).toFixed(2)) : 0,
@@ -306,54 +301,48 @@ app.get("/api/incidents", async (req, res) => {
     }
 
     const incidentMatchersSql = incidents
-      .map(() => "(DATE_FORMAT(review_date, '%Y-%m-%d') = ? AND meal = ?)")
+      .map(() => "(DATE_FORMAT(date, '%Y-%m-%d') = ? AND food = ?)")
       .join(" OR ");
-    const incidentMatcherParams = incidents.flatMap((item) => [item.date, item.meal]);
+    const incidentMatcherParams = incidents.flatMap((item) => [item.date, item.food]);
 
     const studentSelectSql = studentColumns.map((col) => `\`${col}\``).join(", ");
     const studentVotesSql = `
       SELECT
-        DATE_FORMAT(review_date, '%Y-%m-%d') AS review_date,
-        meal,
+        DATE_FORMAT(date, '%Y-%m-%d') AS date,
+        food,
         ${studentSelectSql}
       FROM mess_reviews
       WHERE ${dateFilter.clause}
         AND mess = ?
         AND LOWER(TRIM(quality)) = 'bad'
         AND (${incidentMatchersSql})
-      ORDER BY review_date DESC, meal ASC
+      ORDER BY date DESC, food ASC
     `;
     const studentVoteParams = [...dateFilter.params, mess, ...incidentMatcherParams];
     const [studentRows] = await pool.query(studentVotesSql, studentVoteParams);
 
     const incidentMap = new Map(
-      incidents.map((item) => [`${item.date}__${String(item.meal || "").toLowerCase()}`, { ...item, students: [] }])
+      incidents.map((item) => [`${item.date}__${String(item.food || "").toLowerCase()}`, { ...item, students: [] }])
     );
     const studentMap = new Map();
 
     for (const row of studentRows) {
-      const dateStr = String(row.review_date);
-      const meal = String(row.meal || "");
-      const incidentKey = `${dateStr}__${meal.toLowerCase()}`;
+      const dateStr = String(row.date);
+      const food = String(row.food || "");
+      const incidentKey = `${dateStr}__${food.toLowerCase()}`;
       const incident = incidentMap.get(incidentKey);
       if (!incident) continue;
 
       const student = {
-        studentId: row.student_id ?? null,
-        name: row.student_name ?? null,
-        email: row.student_email ?? null,
-        hostel: row.hostel ?? null,
-        roomNo: row.room_no ?? null,
-        department: row.department ?? null,
-        batch: row.batch ?? null,
+        rollNumber: row.roll_number ?? null,
+        email: row.email ?? null,
       };
 
       incident.students.push(student);
 
       const identityKey = [
-        student.studentId ?? "",
+        student.rollNumber ?? "",
         student.email ?? "",
-        student.name ?? "",
       ].join("|");
       if (!identityKey.replace(/\|/g, "").trim()) continue;
 
@@ -371,13 +360,8 @@ app.get("/api/incidents", async (req, res) => {
 
     const studentIncidentSummary = Array.from(studentMap.values())
       .map((entry) => ({
-        studentId: entry.studentId,
-        name: entry.name,
+        rollNumber: entry.rollNumber,
         email: entry.email,
-        hostel: entry.hostel,
-        roomNo: entry.roomNo,
-        department: entry.department,
-        batch: entry.batch,
         incidentCount: entry.incidentKeys.size,
         totalBadVotesInIncidents: entry.totalBadVotesInIncidents,
       }))
